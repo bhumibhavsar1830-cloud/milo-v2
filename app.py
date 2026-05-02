@@ -1,14 +1,12 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, Response
 from groq import Groq
 from gtts import gTTS
 from langdetect import detect
-import tempfile, os, datetime
+import tempfile, os, datetime, io
 
 app = Flask(__name__)
-import os
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
 conversation_history = []
-audio_files = {}
 
 APP_COMMANDS = {
     "open gmail": "https://mail.google.com",
@@ -46,17 +44,14 @@ def check_commands(user_input):
     for command, url in APP_COMMANDS.items():
         if command in text:
             return {"type": "open_url", "url": url}
-    if any(w in text for w in ["time", "samay", "vakt", "kel kiti", "kitne baje"]):
+    if any(w in text for w in ["time", "samay", "vakt", "kitne baje"]):
         now = datetime.datetime.now().strftime("%I:%M %p")
         return {"type": "info", "response": f"Current time is {now}"}
-    if any(w in text for w in ["date", "aaj", "tarikh", "today", "konchi tarikh"]):
+    if any(w in text for w in ["date", "aaj", "tarikh", "today"]):
         today = datetime.datetime.now().strftime("%A, %d %B %Y")
         return {"type": "info", "response": f"Today is {today}"}
     if any(w in text for w in ["weather", "mausam", "havaman"]):
         return {"type": "open_url", "url": "https://weather.com"}
-    if any(w in text for w in ["search", "dhundo", "khojo"]):
-        query = text.replace("search", "").replace("dhundo", "").replace("khojo", "").strip()
-        return {"type": "open_url", "url": f"https://www.google.com/search?q={query}"}
     return None
 
 def ask_milo(user_input):
@@ -69,21 +64,19 @@ def ask_milo(user_input):
             "content": """You are Milo V2, an advanced AI assistant like Jarvis.
 You support English, Hindi, Gujarati, Marathi.
 Always reply in the same language the user speaks.
-Be smart, helpful, friendly and concise.
-You can open apps, search web, answer questions, tell time and date."""
+Be smart, helpful, friendly and concise."""
         }] + conversation_history
     )
     reply = response.choices[0].message.content
     conversation_history.append({"role": "assistant", "content": reply})
     return reply
 
-def make_audio(reply, lang):
+def make_audio_bytes(reply, lang):
     tts = gTTS(text=reply, lang=lang, slow=False)
-    temp_audio = tempfile.mktemp(suffix='.mp3')
-    tts.save(temp_audio)
-    audio_id = os.path.basename(temp_audio)
-    audio_files[audio_id] = temp_audio
-    return audio_id
+    audio_buffer = io.BytesIO()
+    tts.write_to_fp(audio_buffer)
+    audio_buffer.seek(0)
+    return audio_buffer.read()
 
 @app.route('/')
 def home():
@@ -99,25 +92,30 @@ def chat():
         if command_result['type'] == 'open_url':
             reply = ask_milo(user_input)
             lang = detect_language(reply)
-            audio_id = make_audio(reply, lang)
-            return jsonify({'reply': reply, 'audio_id': audio_id, 'lang': lang, 'action': 'open_url', 'url': command_result['url']})
+            return jsonify({
+                'reply': reply,
+                'lang': lang,
+                'action': 'open_url',
+                'url': command_result['url']
+            })
         elif command_result['type'] == 'info':
             reply = command_result['response']
-            audio_id = make_audio(reply, 'en')
-            return jsonify({'reply': reply, 'audio_id': audio_id, 'lang': 'en'})
+            return jsonify({'reply': reply, 'lang': 'en'})
 
     reply = ask_milo(user_input)
     lang = detect_language(reply)
-    audio_id = make_audio(reply, lang)
-    return jsonify({'reply': reply, 'audio_id': audio_id, 'lang': lang})
+    return jsonify({'reply': reply, 'lang': lang})
 
-@app.route('/audio/<audio_id>')
-def audio(audio_id):
-    if audio_id in audio_files:
-        path = audio_files[audio_id]
-        if os.path.exists(path):
-            return send_file(path, mimetype='audio/mpeg')
-    return "Not found", 404
+@app.route('/speak', methods=['POST'])
+def speak():
+    data = request.json
+    text = data.get('text', '')
+    lang = data.get('lang', 'en')
+    try:
+        audio_bytes = make_audio_bytes(text, lang)
+        return Response(audio_bytes, mimetype='audio/mpeg')
+    except Exception as e:
+        return str(e), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
