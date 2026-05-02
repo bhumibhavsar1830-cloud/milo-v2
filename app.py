@@ -41,17 +41,42 @@ def detect_language(text):
 
 def check_commands(user_input):
     text = user_input.lower()
+
+    # App open commands
     for command, url in APP_COMMANDS.items():
         if command in text:
             return {"type": "open_url", "url": url}
+
+    # Time
     if any(w in text for w in ["time", "samay", "vakt", "kitne baje"]):
         now = datetime.datetime.now().strftime("%I:%M %p")
         return {"type": "info", "response": f"Current time is {now}"}
+
+    # Date
     if any(w in text for w in ["date", "aaj", "tarikh", "today"]):
         today = datetime.datetime.now().strftime("%A, %d %B %Y")
         return {"type": "info", "response": f"Today is {today}"}
+
+    # Weather
     if any(w in text for w in ["weather", "mausam", "havaman"]):
         return {"type": "open_url", "url": "https://weather.com"}
+
+    # Play song - specific song
+    if any(w in text for w in ["play song", "play music", "gaana bajao", "music bajao", "song bajao", "gaana chalaao"]):
+        return {"type": "open_url", "url": "https://open.spotify.com"}
+
+    # Play specific song on YouTube
+    if "play" in text or "bajao" in text:
+        query = text.replace("play", "").replace("bajao", "").strip()
+        if query:
+            return {"type": "open_url", "url": f"https://www.youtube.com/results?search_query={query}+song"}
+
+    # Web search
+    if any(w in text for w in ["search", "dhundo", "khojo"]):
+        query = text.replace("search", "").replace("dhundo", "").replace("khojo", "").strip()
+        if query:
+            return {"type": "open_url", "url": f"https://www.google.com/search?q={query}"}
+
     return None
 
 def ask_milo(user_input):
@@ -64,7 +89,8 @@ def ask_milo(user_input):
             "content": """You are Milo V2, an advanced AI assistant like Jarvis.
 You support English, Hindi, Gujarati, Marathi.
 Always reply in the same language the user speaks.
-Be smart, helpful, friendly and concise."""
+Be smart, helpful, friendly and concise.
+You can open apps, play songs, search web, answer questions, tell time and date."""
         }] + conversation_history
     )
     reply = response.choices[0].message.content
@@ -100,7 +126,10 @@ def chat():
             })
         elif command_result['type'] == 'info':
             reply = command_result['response']
-            return jsonify({'reply': reply, 'lang': 'en'})
+            return jsonify({
+                'reply': reply,
+                'lang': 'en'
+            })
 
     reply = ask_milo(user_input)
     lang = detect_language(reply)
