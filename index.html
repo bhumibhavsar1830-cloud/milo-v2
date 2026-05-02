@@ -184,12 +184,19 @@ async function sendMessage() {
     window.open(data.url, '_blank');
   }
 
-  const audio = new Audio('/audio/' + data.audio_id);
-  audio.play();
-  audio.onended = () => {
+  const speakRes = await fetch('/speak', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text: data.reply, lang: data.lang})
+});
+const audioBlob = await speakRes.blob();
+const audioUrl = URL.createObjectURL(audioBlob);
+const audio = new Audio(audioUrl);
+audio.play();
+audio.onended = () => {
     document.getElementById('orb').classList.remove('speaking');
     document.getElementById('status').textContent = 'TAP ORB OR MIC TO SPEAK';
-  };
+};
 }
 
 function startListening() {
