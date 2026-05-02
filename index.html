@@ -180,9 +180,11 @@ async function sendMessage() {
     const data = await res.json();
     addMessage(data.reply, 'milo', data.lang);
 
-    if (data.action === 'open_url') {
-      window.open(data.url, '_blank');
-    }
+   if (data.action === 'open_url') {
+  setTimeout(() => {
+    window.location.href = data.url;
+  }, 2000);
+}
 
     try {
       const speakRes = await fetch('/speak', {
