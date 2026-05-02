@@ -171,32 +171,46 @@ async function sendMessage() {
   document.getElementById('status').textContent = 'MILO IS THINKING...';
   document.getElementById('orb').classList.add('speaking');
 
-  const res = await fetch('/chat', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({message: msg})
-  });
+  try {
+    const res = await fetch('/chat', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({message: msg})
+    });
+    const data = await res.json();
+    addMessage(data.reply, 'milo', data.lang);
 
-  const data = await res.json();
-  addMessage(data.reply, 'milo', data.lang);
+    if (data.action === 'open_url') {
+      window.open(data.url, '_blank');
+    }
 
-  if (data.action === 'open_url') {
-    window.open(data.url, '_blank');
-  }
+    try {
+      const speakRes = await fetch('/speak', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: data.reply, lang: data.lang})
+      });
+      if (speakRes.ok) {
+        const audioBlob = await speakRes.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        await audio.play();
+        audio.onended = () => {
+          document.getElementById('orb').classList.remove('speaking');
+          document.getElementById('status').textContent = 'TAP ORB OR MIC TO SPEAK';
+        };
+      }
+    } catch(audioErr) {
+      console.log('Audio error:', audioErr);
+      document.getElementById('orb').classList.remove('speaking');
+      document.getElementById('status').textContent = 'TAP ORB OR MIC TO SPEAK';
+    }
 
-  const speakRes = await fetch('/speak', {
-    method: 'POST',
-    headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({text: data.reply, lang: data.lang})
-});
-const audioBlob = await speakRes.blob();
-const audioUrl = URL.createObjectURL(audioBlob);
-const audio = new Audio(audioUrl);
-audio.play();
-audio.onended = () => {
+  } catch(err) {
+    console.log('Error:', err);
     document.getElementById('orb').classList.remove('speaking');
-    document.getElementById('status').textContent = 'TAP ORB OR MIC TO SPEAK';
-};
+    document.getElementById('status').textContent = 'ERROR. TRY AGAIN!';
+  }
 }
 
 function startListening() {
