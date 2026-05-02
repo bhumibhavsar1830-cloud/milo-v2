@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Milo V2 - AI Assistant</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background: #0a0a0f;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bg {
+  position: fixed;
+  width: 100%; height: 100%;
+  background: radial-gradient(ellipse at center, #0d1b4b 0%, #0a0a0f 70%);
+  z-index: 0;
+}
+.container {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 480px;
+  padding: 20px;
+}
+.header { text-align: center; margin-bottom: 20px; }
+.orb-container {
+  position: relative;
+  width: 120px; height: 120px;
+  margin: 0 auto 16px;
+}
+.orb {
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #4fc3f7, #1565c0, #0d47a1);
+  box-shadow: 0 0 40px #1565c0, 0 0 80px #0d47a1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.orb.listening { animation: pulse 1s infinite; box-shadow: 0 0 60px #4fc3f7; }
+.orb.speaking { animation: speak 0.5s infinite alternate; box-shadow: 0 0 60px #7c4dff; }
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.1)} }
+@keyframes speak { 0%{transform:scale(1)} 100%{transform:scale(1.06)} }
+.ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  width: 120px; height: 120px;
+  border-radius: 50%;
+  border: 1px solid rgba(79,195,247,0.3);
+  animation: expand 2s infinite;
+}
+.ring:nth-child(2){animation-delay:0.6s}
+.ring:nth-child(3){animation-delay:1.2s}
+@keyframes expand { 0%{transform:translate(-50%,-50%) scale(1);opacity:0.5} 100%{transform:translate(-50%,-50%) scale(2.2);opacity:0} }
+h1 { color: white; font-size: 30px; font-weight: 700; letter-spacing: 5px; }
+.version { color: #4fc3f7; font-size: 11px; letter-spacing: 5px; margin-top: 4px; }
+.chat-box {
+  height: 280px;
+  overflow-y: auto;
+  margin: 16px 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.07);
+}
+.chat-box::-webkit-scrollbar{width:3px}
+.chat-box::-webkit-scrollbar-thumb{background:#1565c0;border-radius:2px}
+.message { margin: 10px 0; display: flex; align-items: flex-end; gap: 8px; animation: fadeUp 0.3s ease; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.message.user { flex-direction: row-reverse; }
+.bubble { max-width: 78%; padding: 10px 14px; border-radius: 16px; font-size: 14px; line-height: 1.5; }
+.user .bubble { background: linear-gradient(135deg,#1565c0,#7c4dff); color: white; border-bottom-right-radius: 4px; }
+.milo .bubble { background: rgba(255,255,255,0.07); color: #e0e0e0; border: 1px solid rgba(255,255,255,0.1); border-bottom-left-radius: 4px; }
+.lang-tag { font-size: 10px; color: #4fc3f7; margin-top: 4px; display: block; }
+.controls { display: flex; gap: 8px; align-items: center; }
+.text-input {
+  flex: 1; padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05);
+  color: white; font-size: 14px; outline: none;
+}
+.text-input:focus { border-color: #4fc3f7; }
+.text-input::placeholder { color: rgba(255,255,255,0.3); }
+.btn { width: 48px; height: 48px; border-radius: 12px; border: none; cursor: pointer; font-size: 20px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.btn-mic { background: rgba(255,255,255,0.07); color: white; border: 1px solid rgba(255,255,255,0.1); }
+.btn-mic.recording { background: #e53935; animation: pulse 1s infinite; }
+.btn-send { background: linear-gradient(135deg,#1565c0,#7c4dff); color: white; }
+.btn:hover { transform: scale(1.05); }
+.status { text-align: center; color: rgba(255,255,255,0.3); font-size: 11px; margin-top: 10px; letter-spacing: 1px; }
+.quick-cmds { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; justify-content: center; }
+.cmd { padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(79,195,247,0.3); background: rgba(79,195,247,0.05); color: #4fc3f7; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+.cmd:hover { background: rgba(79,195,247,0.15); transform: scale(1.05); }
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="container">
+  <div class="header">
+    <div class="orb-container">
+      <div class="ring"></div>
+      <div class="ring"></div>
+      <div class="ring"></div>
+      <div class="orb" id="orb" onclick="startListening()">🤖</div>
+    </div>
+    <h1>MILO</h1>
+    <div class="version">V2 · JARVIS AI</div>
+  </div>
+
+  <div class="chat-box" id="chatBox">
+    <div class="message milo">
+      <div>
+        <div class="bubble">Hello! I am Milo V2 🚀 Your personal Jarvis! Tap the orb to speak or type below!</div>
+        <span class="lang-tag">🇬🇧 English</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <input type="text" class="text-input" id="userInput" placeholder="Ask Milo anything..." />
+    <button class="btn btn-mic" id="micBtn" onclick="startListening()">🎙️</button>
+    <button class="btn btn-send" onclick="sendMessage()">➤</button>
+  </div>
+
+  <div class="status" id="status">TAP ORB OR MIC TO SPEAK</div>
+
+  <div class="quick-cmds">
+    <button class="cmd" onclick="quickCmd('Open Gmail')">📧 Gmail</button>
+    <button class="cmd" onclick="quickCmd('Open YouTube')">▶️ YouTube</button>
+    <button class="cmd" onclick="quickCmd('Open WhatsApp')">💬 WhatsApp</button>
+    <button class="cmd" onclick="quickCmd('Open Instagram')">📸 Instagram</button>
+    <button class="cmd" onclick="quickCmd('What time is it')">🕐 Time</button>
+    <button class="cmd" onclick="quickCmd('What is todays date')">📅 Date</button>
+    <button class="cmd" onclick="quickCmd('Open Maps')">🗺️ Maps</button>
+    <button class="cmd" onclick="quickCmd('Open Netflix')">🎬 Netflix</button>
+  </div>
+</div>
+
+<script>
+const langNames = {'en':'🇬🇧 English','hi':'🇮🇳 Hindi','gu':'🇮🇳 Gujarati','mr':'🇮🇳 Marathi'};
+
+function addMessage(text, sender, lang='en') {
+  const box = document.getElementById('chatBox');
+  const div = document.createElement('div');
+  div.className = `message ${sender}`;
+  div.innerHTML = `<div><div class="bubble">${text}</div><span class="lang-tag">${langNames[lang]||'🇬🇧 English'}</span></div>`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+function quickCmd(cmd) {
+  document.getElementById('userInput').value = cmd;
+  sendMessage();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('userInput');
+  const msg = input.value.trim();
+  if (!msg) return;
+  addMessage(msg, 'user');
+  input.value = '';
+  document.getElementById('status').textContent = 'MILO IS THINKING...';
+  document.getElementById('orb').classList.add('speaking');
+
+  const res = await fetch('/chat', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({message: msg})
+  });
+
+  const data = await res.json();
+  addMessage(data.reply, 'milo', data.lang);
+
+  if (data.action === 'open_url') {
+    window.open(data.url, '_blank');
+  }
+
+  const audio = new Audio('/audio/' + data.audio_id);
+  audio.play();
+  audio.onended = () => {
+    document.getElementById('orb').classList.remove('speaking');
+    document.getElementById('status').textContent = 'TAP ORB OR MIC TO SPEAK';
+  };
+}
+
+function startListening() {
+  const btn = document.getElementById('micBtn');
+  const orb = document.getElementById('orb');
+  if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+    document.getElementById('status').textContent = 'USE CHROME BROWSER!';
+    return;
+  }
+  const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+  recognition.lang = 'hi-IN';
+  recognition.interimResults = false;
+  btn.classList.add('recording');
+  orb.classList.add('listening');
+  document.getElementById('status').textContent = '🎙️ LISTENING...';
+  recognition.onresult = (e) => {
+    document.getElementById('userInput').value = e.results[0][0].transcript;
+    btn.classList.remove('recording');
+    orb.classList.remove('listening');
+    sendMessage();
+  };
+  recognition.onerror = () => {
+    btn.classList.remove('recording');
+    orb.classList.remove('listening');
+    document.getElementById('status').textContent = 'MIC ERROR. TRY TYPING!';
+  };
+  recognition.onend = () => {
+    btn.classList.remove('recording');
+    orb.classList.remove('listening');
+  };
+  recognition.start();
+}
+
+document.getElementById('userInput').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') sendMessage();
+});
+</script>
+</body>
+</html>
