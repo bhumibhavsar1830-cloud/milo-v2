@@ -175,6 +175,7 @@ h1 { color: white; font-size: 30px; font-weight: 700; letter-spacing: 5px; }
 <script>
 const langNames = {'en':'🇬🇧 English','hi':'🇮🇳 Hindi','gu':'🇮🇳 Gujarati','mr':'🇮🇳 Marathi'};
 let currentAudio = null;
+let currentVideoId = null;
 
 function stopCurrentAudio() {
   if (currentAudio) {
@@ -186,25 +187,28 @@ function stopCurrentAudio() {
 
 function closePlayer() {
   const player = document.getElementById('ytPlayer');
+  const container = document.getElementById('playerContainer');
   player.src = '';
-  player.srcdoc = '';
-  document.getElementById('playerContainer').classList.remove('active');
+  container.classList.remove('active');
+  currentVideoId = null; // Reset so same song can play again!
 }
 
 function playSongInPlayer(videoId) {
-  if (videoId) {
-    const player = document.getElementById('ytPlayer');
-    // Reset first
-    player.src = '';
-    document.getElementById('playerContainer').classList.remove('active');
-    // Load new song after short delay
-    setTimeout(() => {
-      player.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
-      document.getElementById('playerContainer').classList.add('active');
-      // Scroll to player
-      document.getElementById('playerContainer').scrollIntoView({behavior: 'smooth'});
-    }, 400);
-  }
+  if (!videoId) return;
+  currentVideoId = videoId;
+
+  const player = document.getElementById('ytPlayer');
+  const container = document.getElementById('playerContainer');
+
+  // Always reset and reload
+  container.classList.remove('active');
+  player.src = '';
+
+  setTimeout(() => {
+    player.src = `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+    container.classList.add('active');
+    container.scrollIntoView({behavior: 'smooth'});
+  }, 500);
 }
 
 function addMessage(text, sender, lang='en') {
@@ -242,18 +246,14 @@ async function sendMessage() {
     const data = await res.json();
     addMessage(data.reply, 'milo', data.lang);
 
-    // Handle song
     if (data.action === 'play_song' && data.video_id) {
       playSongInPlayer(data.video_id);
-    }
-    // Handle open url
-    else if (data.action === 'open_url') {
+    } else if (data.action === 'open_url') {
       setTimeout(() => {
         window.open(data.url, '_blank');
       }, 1500);
     }
 
-    // Play Milo voice
     try {
       const speakRes = await fetch('/speak', {
         method: 'POST',
@@ -277,7 +277,6 @@ async function sendMessage() {
     }
 
   } catch(err) {
-    console.log('Error:', err);
     document.getElementById('orb').classList.remove('speaking');
     document.getElementById('status').textContent = 'ERROR. TRY AGAIN!';
   }
@@ -286,9 +285,7 @@ async function sendMessage() {
 function startListening() {
   const btn = document.getElementById('micBtn');
   const orb = document.getElementById('orb');
-
   stopCurrentAudio();
-
   if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
     document.getElementById('status').textContent = 'USE CHROME BROWSER!';
     return;
