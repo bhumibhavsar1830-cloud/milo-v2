@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify, Response
 from groq import Groq
 from gtts import gTTS
 from langdetect import detect
-import os, datetime, io
+import os, datetime, io, urllib.request
 
 app = Flask(__name__)
 client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
@@ -62,10 +62,9 @@ def check_commands(user_input):
         for w in ["play", "bajao", "song", "gaana", "music", "chalaao", "baja", "bajado"]:
             query = query.replace(w, "")
         query = query.strip()
-        if query:
-    return {"type": "play_song", "url": f"https://www.jiosaavn.com/search/{query}", "query": query}
-else:
-    return {"type": "play_song", "url": "https://www.jiosaavn.com", "query": "top songs"}
+        if not query:
+            query = "top hindi songs"
+        return {"type": "play_song", "query": query}
 
     if any(w in text for w in ["search", "dhundo", "khojo"]):
         query = text.replace("search", "").replace("dhundo", "").replace("khojo", "").strip()
@@ -84,7 +83,7 @@ def ask_milo(user_input):
             "content": """You are Milo V2, a smart AI assistant like Jarvis.
 Reply in the SAME language the user speaks.
 Support: English, Hindi, Gujarati, Marathi.
-Keep replies SHORT — max 2 sentences only!
+Keep replies SHORT - max 2 sentences only!
 Never repeat yourself."""
         }] + conversation_history
     )
@@ -98,6 +97,18 @@ def make_audio(text, lang):
     tts.write_to_fp(buf)
     buf.seek(0)
     return buf.read()
+
+def get_youtube_video_id(query):
+    try:
+        search_url = f"https://www.youtube.com/results?search_query={query}"
+        req = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
+        response = urllib.request.urlopen(req)
+        html = response.read().decode()
+        start = html.find('"videoId":"') + 11
+        video_id = html[start:start+11]
+        return video_id
+    except:
+        return None
 
 @app.route('/')
 def home():
@@ -113,14 +124,27 @@ def chat():
         if command_result['type'] == 'open_url':
             reply = ask_milo(user_input)
             lang = detect_language(reply)
-            return jsonify({'reply': reply, 'lang': lang, 'action': 'open_url', 'url': command_result['url']})
+            return jsonify({
+                'reply': reply,
+                'lang': lang,
+                'action': 'open_url',
+                'url': command_result['url']
+            })
         elif command_result['type'] == 'play_song':
-            query = command_result.get('query', 'music')
+            query = command_result.get('query', 'top hindi songs')
+            video_id = get_youtube_video_id(query)
             reply = f"Playing {query} for you!"
-            lang = 'en'
-            return jsonify({'reply': reply, 'lang': lang, 'action': 'open_url', 'url': command_result['url']})
+            return jsonify({
+                'reply': reply,
+                'lang': 'en',
+                'action': 'play_song',
+                'video_id': video_id
+            })
         elif command_result['type'] == 'info':
-            return jsonify({'reply': command_result['response'], 'lang': 'en'})
+            return jsonify({
+                'reply': command_result['response'],
+                'lang': 'en'
+            })
 
     reply = ask_milo(user_input)
     lang = detect_language(reply)
