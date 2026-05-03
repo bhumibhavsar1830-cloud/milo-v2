@@ -63,9 +63,9 @@ def check_commands(user_input):
             query = query.replace(w, "")
         query = query.strip()
         if query:
-            return {"type": "play_song", "url": f"https://www.youtube.com/results?search_query={query}+song", "query": query}
-        else:
-            return {"type": "play_song", "url": "https://www.youtube.com/results?search_query=top+hindi+songs+2025", "query": "top hindi songs"}
+    return {"type": "play_song", "url": f"https://www.jiosaavn.com/search/{query}", "query": query}
+else:
+    return {"type": "play_song", "url": "https://www.jiosaavn.com", "query": "top songs"}
 
     if any(w in text for w in ["search", "dhundo", "khojo"]):
         query = text.replace("search", "").replace("dhundo", "").replace("khojo", "").strip()
