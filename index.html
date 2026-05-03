@@ -147,6 +147,15 @@ h1 { color: white; font-size: 30px; font-weight: 700; letter-spacing: 5px; }
 
 <script>
 const langNames = {'en':'🇬🇧 English','hi':'🇮🇳 Hindi','gu':'🇮🇳 Gujarati','mr':'🇮🇳 Marathi'};
+let currentAudio = null;
+
+function stopCurrentAudio() {
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.currentTime = 0;
+    currentAudio = null;
+  }
+}
 
 function addMessage(text, sender, lang='en') {
   const box = document.getElementById('chatBox');
@@ -166,6 +175,10 @@ async function sendMessage() {
   const input = document.getElementById('userInput');
   const msg = input.value.trim();
   if (!msg) return;
+
+  // Stop any current audio
+  stopCurrentAudio();
+
   addMessage(msg, 'user');
   input.value = '';
   document.getElementById('status').textContent = 'MILO IS THINKING...';
@@ -180,36 +193,38 @@ async function sendMessage() {
     const data = await res.json();
     addMessage(data.reply, 'milo', data.lang);
 
-   if (data.action === 'open_url') {
-  setTimeout(() => {
-    window.location.href = data.url;
-  }, 2000);
-}
-
+    // Play audio first then open URL
     try {
       const speakRes = await fetch('/speak', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({text: data.reply, lang: data.lang})
       });
+
       if (speakRes.ok) {
         const audioBlob = await speakRes.blob();
         const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        await audio.play();
-        audio.onended = () => {
+        currentAudio = new Audio(audioUrl);
+        await currentAudio.play();
+        currentAudio.onended = () => {
           document.getElementById('orb').classList.remove('speaking');
           document.getElementById('status').textContent = 'TAP ORB OR MIC TO SPEAK';
+          currentAudio = null;
+          // Open URL after audio finishes
+          if (data.action === 'open_url') {
+            window.open(data.url, '_blank');
+          }
         };
       }
     } catch(audioErr) {
-      console.log('Audio error:', audioErr);
       document.getElementById('orb').classList.remove('speaking');
       document.getElementById('status').textContent = 'TAP ORB OR MIC TO SPEAK';
+      if (data.action === 'open_url') {
+        window.open(data.url, '_blank');
+      }
     }
 
   } catch(err) {
-    console.log('Error:', err);
     document.getElementById('orb').classList.remove('speaking');
     document.getElementById('status').textContent = 'ERROR. TRY AGAIN!';
   }
@@ -218,6 +233,9 @@ async function sendMessage() {
 function startListening() {
   const btn = document.getElementById('micBtn');
   const orb = document.getElementById('orb');
+
+  stopCurrentAudio();
+
   if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
     document.getElementById('status').textContent = 'USE CHROME BROWSER!';
     return;
